@@ -1,6 +1,6 @@
 ;;全画面 
 (setq initial-frame-alist 
-'((top . 1) (left . 1240) (width . 80) (height . 60)))
+'((top . 1) (left . 40) (width . 150) (height . 62)))
 
 ;; emacs clientから接続可能にする
 (server-start)
@@ -8,6 +8,10 @@
 ;;フォントサイズ
 (add-to-list 'default-frame-alist
              '(font . "-*-Menlo-normal-normal-normal-*-14-*-*-*-m-0-iso10646-1"))
+
+;; 起動時に2分割
+(setq w (selected-window))
+(setq w2 (split-window w nil t))
 
 ;; visual-line-mode 
 ;(global-visual-line-mode) 
@@ -87,6 +91,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(custom-enabled-themes (quote (manoj-dark)))
  '(package-selected-packages (quote (recentf-ext))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
@@ -102,3 +107,50 @@
      ("\\.\\(xls\\|XLS\\|xlsx\\|XLSX\\)\\'" "qlmanage -p")
      ("\\.\\(jpg\\|JPG\\|png\\|PNG\\|pdf\\|PDF\\)\\'" "qlmanage -p")
      ("\\.\\(m4a\\|mp3\\|wav\\)\\'" "afplay -q 1 * &")))
+
+;; weblio
+(require 'eww)
+(defvar eww-data)
+(defun eww-current-url ()
+  "バージョン間の非互換を吸収する。"
+  (if (boundp 'eww-current-url)
+      eww-current-url                   ;emacs24.4
+    (plist-get eww-data :url)))         ;emacs25
+
+(defun eww-set-start-at (url-regexp search-regexp)
+  "URL-REGEXPにマッチするURLにて、SEARCH-REGEXPの行から表示させる"
+  (when (string-match url-regexp (eww-current-url))
+    (goto-char (point-min))
+    (when (re-search-forward search-regexp nil t)
+      (recenter 0))))
+
+(defun region-or-read-string (prompt &optional initial history default inherit)
+  "regionが指定されているときはその文字列を取得し、それ以外では`read-string'を呼ぶ。"
+  (if (not (region-active-p))
+      (read-string prompt initial history default inherit)
+    (prog1
+        (buffer-substring-no-properties (region-beginning) (region-end))
+      (deactivate-mark)
+      (message ""))))
+
+(defun eww-render--after (&rest _)
+  (eww-set-start-at "www.weblio.jp" "^ *Weblio 辞書")
+  ;; 他のサイトの設定も同様に追加できる
+  )
+;;; [2017-01-14 Sat]バージョンごとに分岐
+(if (boundp 'eww-after-render-hook)     ;25.1
+    (add-hook 'eww-after-render-hook 'eww-render--after)
+  (advice-add 'eww-render :after 'eww-render--after)) ;24.4
+
+;;; weblio
+(defun weblio (str)
+  (interactive (list
+                (region-or-read-string "Weblio: ")))
+  (eww-browse-url (format "http://www.weblio.jp/content/%s"
+                      (upcase (url-hexify-string str)))))
+;;; wikipedia
+(defun wikipedia (str)
+  (interactive (list
+                (region-or-read-string "Wikipedia: ")))
+  (eww-browse-url (format "https://ja.wikipedia.org/wiki/%s"
+                      (upcase (url-hexify-string str)))))
